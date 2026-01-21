@@ -3,45 +3,49 @@ const OPENAI_BASE_URL = "https://api.openai.com";
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    const targetUrl = OPENAI_BASE_URL + url.pathname;
+    const targetUrl = OPENAI_BASE_URL + url.pathname + url.search;
 
-    // 預檢請求（CORS）
+    // CORS 預檢
     if (request.method === "OPTIONS") {
       return new Response(null, {
         headers: {
           "Access-Control-Allow-Origin": "*",
           "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type,Authorization",
+          "Access-Control-Allow-Headers": "Content-Type",
         },
       });
     }
 
-    // 複製 headers，並注入 OpenAI API Key
-    const headers = new Headers(request.headers);
+    /**
+     * ⚠️ 關鍵：不要用 request.headers
+     * 只建立「必要的乾淨 headers」
+     */
+    const headers = new Headers();
     headers.set("Authorization", `Bearer ${env.OPENAI_API_KEY}`);
-    headers.set("Host", "api.openai.com");
+    headers.set("Content-Type", "application/json");
+    headers.set("Accept", "application/json");
 
-    // 讀取 body（只能一次）
-    const body =
-      request.method === "GET" || request.method === "HEAD"
-        ? undefined
-        : await request.arrayBuffer();
+    // 只在需要 body 的方法讀 body
+    let body;
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      body = await request.text(); // 保留原始 JSON
+    }
 
-    const proxyRequest = new Request(targetUrl, {
+    const openaiRequest = new Request(targetUrl, {
       method: request.method,
       headers,
       body,
     });
 
-    const response = await fetch(proxyRequest);
+    const response = await fetch(openaiRequest);
 
     // 回傳 response（加 CORS）
-    const newHeaders = new Headers(response.headers);
-    newHeaders.set("Access-Control-Allow-Origin", "*");
+    const respHeaders = new Headers(response.headers);
+    respHeaders.set("Access-Control-Allow-Origin", "*");
 
     return new Response(response.body, {
       status: response.status,
-      headers: newHeaders,
+      headers: respHeaders,
     });
   },
 };
