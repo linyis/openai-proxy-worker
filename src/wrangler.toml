@@ -1,0 +1,6 @@
+name = "openai-proxy"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+# 非敏感變數可放這裡
